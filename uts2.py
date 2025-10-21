@@ -13,7 +13,7 @@ else:
 
     # Menentukan kategori total setoran
     if total < 300000:
-        print("Kategori: Rendah")
+        print("Kategori: Rendahh")
     elif total < 600000:
         print("Kategori: Sedang")
     else:
