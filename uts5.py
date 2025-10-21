@@ -1,52 +1,83 @@
-import os
-import csv
-import json
-import logging
+import os, csv, json, logging, traceback, datetime
+from pathlib import Path
 
-# Konfigurasi logging
+# Konfigurasi Folder & File 
+DATA_DIR = Path("data")
+CSV_PATH = DATA_DIR / "presensi.csv"
+JSON_PATH = DATA_DIR / "ringkasan.json"
+LOG_PATH = DATA_DIR / "app.log"
+
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+# Logging Sederhana 
 logging.basicConfig(
+    filename=LOG_PATH,
     level=logging.INFO,
-    format='%(levelname)s: %(message)s'
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
 )
 
-try:
-    logging.info("Program dimulai...")
+#  Fungsi Menulis CSV
+def tulis_csv(path):
+    print("\n=== Input Data Mahasiswa ===")
+    try:
+        jml = int(input("Masukkan jumlah mahasiswa: "))
+        data = []
+        for i in range(jml):
+            print(f"\nData ke-{i+1}")
+            nim = input("NIM: ")
+            nama = input("Nama: ")
+            hadir = input("Hadir UTS (1=hadir, 0=tidak): ")
+            data.append([nim, nama, hadir])
 
-    # 1. Membuat folder data
-    os.makedirs("data", exist_ok=True)
+        with open(path, "w", newline='', encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["nim", "nama", "hadir_uts"])
+            writer.writerows(data)
 
-    # 2. Menulis file CSV
-    with open("data/presensi.csv", mode="w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow(["nim", "nama", "hadir_uts"])
-        writer.writerow(["230101001", "anugrah", 1])
-        writer.writerow(["230101002", "hanif", 0])
-        writer.writerow(["230101003", "bagas", 1])
-        writer.writerow(["230101003", "yoma", 0])
-        writer.writerow(["230101003", "desta", 1])
-    logging.info("File presensi.csv berhasil dibuat.")
+        logging.info("Sukses menulis CSV.")
+        print("\n✅ Data berhasil disimpan ke presensi.csv")
+    except Exception as e:
+        logging.error(f"Gagal menulis CSV: {e}")
+        print("❌ Terjadi kesalahan saat menulis CSV:", e)
 
-    # 3. Membaca kembali CSV dan menghitung ringkasan
-    with open("data/presensi.csv", mode="r", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        data = list(reader)
+# Fungsi Membaca CSV dan Simpan Ringkasan JSON 
+def baca_dan_ringkas(path):
+    try:
+        with open(path, newline='', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
 
-    total = len(data)
-    hadir = sum(int(row["hadir_uts"]) for row in data)
-    persentase = (hadir / total) * 100
+        total = len(rows)
+        hadir = sum(1 for r in rows if r["hadir_uts"] == "1")
+        persen = round((hadir / total * 100) if total else 0, 2)
 
-    ringkasan = {
-        "total_mahasiswa": total,
-        "hadir": hadir,
-        "persentase_hadir": persentase
-    }
+        ringkasan = {
+            "total": total,
+            "hadir": hadir,
+            "persentase_hadir": persen,
+            "tanggal_diproses": datetime.datetime.now().isoformat(),
+            "data": rows
+        }
 
-    # Simpan ke JSON
-    with open("data/ringkasan.json", mode="w", encoding="utf-8") as f:
-        json.dump(ringkasan, f, indent=4)
-    logging.info("File ringkasan.json berhasil disimpan.")
+        with open(JSON_PATH, "w", encoding="utf-8") as jf:
+            json.dump(ringkasan, jf, indent=2, ensure_ascii=False)
 
-    logging.info("Program selesai dengan sukses.")
+        logging.info("Sukses membuat ringkasan JSON.")
+        print("\n📊 Ringkasan disimpan ke ringkasan.json")
+        print(f"Total: {total}, Hadir: {hadir}, Persentase: {persen}%")
 
-except Exception as e:
-    logging.error(f"Terjadi kesalahan: {e}")
+    except Exception as e:
+        logging.error(f"Gagal membaca CSV: {e}")
+        print("❌ Terjadi kesalahan saat membaca/meringkas CSV:", e)
+
+# Program Utama 
+if _name_ == "_main_":
+    logging.info("Program dimulai.")
+    try:
+        tulis_csv(CSV_PATH)
+        baca_dan_ringkas(CSV_PATH)
+        logging.info("Program selesai dengan sukses.")
+    except Exception as e:
+        logging.error(f"Program gagal: {e}")
+        print("❌ Program gagal dijalankan.")
